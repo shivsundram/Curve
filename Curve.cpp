@@ -1,6 +1,6 @@
 // Curve.cpp : Defines the entry point for the console application.
 //
-
+//andrey, leave stdafx.h out of your code. this is a stupid windows thing
 #include "stdafx.h"
 
 
@@ -169,8 +169,6 @@ void parseLine(const std::string& line) {
 	}
 	else if (tokens.size() == 1) {
 		patches = atoi(tokens[0].c_str());
-		cout << patches << endl; 
-		cout << "cool" << endl;
 	}
 
 	else if (tokens.size() == 12) {
@@ -182,18 +180,17 @@ void parseLine(const std::string& line) {
 
 const char* filename;
 int main(int argc, char *argv[]) {
-	//This initializes glut
-
-
 	
 	std::ifstream fin("test.bez");
 	std::string line;
  
 	if (!fin.good())
 	{
-		cout << "wtf" << endl; 
+		cout << "bad file name" << endl; 
 	}
 	else{
+		//first load all text file data into "coordinates" buffer during parse stage. 
+		//after parsing is done, transfer data from buffer into patches, and then clumb all patches together in "bezpatches" vector
 		while (getline(fin, line)) {
 			try {
 				parseLine(line);
@@ -204,19 +201,18 @@ int main(int argc, char *argv[]) {
 			}
 		}
 	}
-	cout << "shit" << endl;
 	cout << patches << endl; 
 	for (int j = 0; j < patches; j++){
 		std::vector <Eigen::Vector3d> curve;
 		for (int i = 0; i < 16; i++){
 			curve.push_back(coordinates[j * 16 + i]);
-			cout << "deon" << endl;
 		}
 		Patch next(curve); 
-		cout << "new patch" << endl;
-		for (int k = 0; k < 16;  k++){
-			cout << curve[k] << endl;
-		}
+		//just for testing
+		//cout << "new patch" << endl;
+		//for (int k = 0; k < 16;  k++){
+		//	cout << curve[k] << endl;
+		//}
 		bezpatches.push_back(next);
 	}
 
