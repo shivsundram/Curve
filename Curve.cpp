@@ -11,10 +11,6 @@
 #include <stdlib.h> 
 #include <string>
 #include <fstream>
-using std::ifstream;
-
-
-
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
@@ -23,9 +19,8 @@ using std::ifstream;
 #include <vector>
 #include <time.h>
 #include <limits>
-
-
 using namespace std;
+
 
 #ifdef _WIN32
 #include <windows.h>
@@ -43,6 +38,9 @@ using namespace std;
 
 #include <Eigen/Dense>
 #include <Eigen/StdVector>
+using namespace Eigen;
+
+
 
 class Viewport {
 public:
@@ -66,11 +64,14 @@ Patch::Patch(std::vector <Eigen::Vector3d> q1){
 Viewport    viewport;
 int patches; 
 vector <Eigen::Vector3d> coordinates;
-vector <Patch> bezpatches; 
+vector <Patch> bezpatches;
 
 //****************************************************
 // reshape viewport if the window is resized
 //****************************************************
+
+
+
 void myReshape(int w, int h) {
 	viewport.w = w;
 	viewport.h = h;
@@ -102,44 +103,39 @@ void initScene(){
 }
 
 
-//***************************************************
-// function that does the actual drawing
-//***************************************************
-void myDisplay() {
-
-	glClear(GL_COLOR_BUFFER_BIT);                // clear the color buffer (sets everything to black)
-
-	glMatrixMode(GL_MODELVIEW);                  // indicate we are specifying camera transformations
-	glLoadIdentity();                            // make sure transformation is "zero'd"
-
-	//----------------------- code to draw objects --------------------------
-	// Rectangle Code
-	//glColor3f(red component, green component, blue component);
-	glColor3f(1.0f, 0.0f, 0.0f);                   // setting the color to pure red 90% for the rect
-
-	glBegin(GL_POLYGON);                         // draw rectangle 
-	//glVertex3f(x val, y val, z val (won't change the point because of the projection type));
-	float farl =1.1f;
-	glVertex3f(-0.8f, 0.0f, farl);               // bottom left corner of rectangle
-	glVertex3f(-0.8f, 0.5f, farl);               // top left corner of rectangle
-	glVertex3f(0.0f, 0.5f, farl);               // top right corner of rectangle
-	glVertex3f(0.0f, 0.0f, farl);               // bottom right corner of rectangle
-	glEnd();
-	// Triangle Code
-	glColor3f(1.0f, 0.5f, 0.0f);                   // setting the color to orange for the triangle
-
-	float basey = -sqrt(0.48f);                  // height of triangle = sqrt(.8^2-.4^2)
-	glBegin(GL_POLYGON);
-	glVertex3f(.5f, 0.0f, 0.0f);                // top tip of triangle
-	glVertex3f(0.1f, basey, 0.0f);               // lower left corner of triangle
-	glVertex3f(0.9f, basey, 0.0f);               // lower right corner of triangle
-	glEnd();
-	//-----------------------------------------------------------------------
-
-	glFlush();
-	glutSwapBuffers();                           // swap buffers (we earlier set double buffer)
+Eigen::Vector3d deCasteljau(Eigen::Vector3d v0, Eigen::Vector3d v1, Eigen::Vector3d v2, Eigen::Vector3d v3, double u){
+	Vector3d result = pow((1 - u), 3)*v0 + 3 * pow((1 - u), 2)*u*v1 + 3 * (1 - u)*pow(u, 2)*v2 + pow(u, 3)*v3; 
+	return result; 
 }
 
+void glgenCurve(Eigen::Vector3d v0, Eigen::Vector3d v1, Eigen::Vector3d v2, Eigen::Vector3d v3, double u){
+	glBegin(GL_LINE_STRIP);
+	for (unsigned int i = 0; i <= (unsigned int) 1/u; ++i){
+		Vector3d result = deCasteljau(v0, v1, v2, v3, (double) (u*i));
+		glVertex3f(result[0], result[1], result[2]);		
+	}
+	glEnd(); 
+
+}
+
+
+
+void display() // adapted from http://stackoverflow.com/questions/13159444/opengl-draw-polygon-with-gl-lines-and-angle-between-lines
+{
+	glClear(GL_COLOR_BUFFER_BIT);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+
+	glColor3ub(255, 0, 0);
+	Vector3d v0(0.0, 0.0, 0.0);
+	Vector3d v1(0.33, 0.33, 0.0);
+	Vector3d v2(0.66, 0.33, 0.0);
+	Vector3d v3(1.0, 0.0, 0.0);
+	glgenCurve(v0, v1, v2, v3, .01);
+	glutSwapBuffers();
+}
 
 //****************************************************
 // called by glut when there are no messages to handle
@@ -156,8 +152,6 @@ void myFrameMove() {
 //****************************************************
 // the usual stuff, nothing exciting here
 //****************************************************
-
-
 
 void parseLine(const std::string& line) {
 	istringstream iss(line);
@@ -217,6 +211,8 @@ int main(int argc, char *argv[]) {
 	}
 
 
+
+
 	glutInit(&argc, argv);
 
 	//This tells glut to use a double-buffered window with red, green, and blue channels 
@@ -233,7 +229,7 @@ int main(int argc, char *argv[]) {
 
 	initScene();                                 // quick function to set up scene
 
-	glutDisplayFunc(myDisplay);                  // function to run when its time to draw something
+	glutDisplayFunc(display);                  // function to run when its time to draw something
 	glutReshapeFunc(myReshape);                  // function to run when the window gets resized
 	glutIdleFunc(myFrameMove);                   // function to run when not handling any other task
 	glutMainLoop();                              // infinite loop that will keep drawing and resizing and whatever else
@@ -242,3 +238,74 @@ int main(int argc, char *argv[]) {
 }
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+//for some reason, this function is shitty and juut doesn't work
+//***************************************************
+// function that does the actual drawing
+//***************************************************
+void myDisplay() {
+
+	glClear(GL_COLOR_BUFFER_BIT);                // clear the color buffer (sets everything to black)
+
+	glMatrixMode(GL_MODELVIEW);                  // indicate we are specifying camera transformations
+	glLoadIdentity();                            // make sure transformation is "zero'd"
+
+
+	Vector3d v0(0.0, 0.0, 0.0);
+	Vector3d v1(0.33, 0.33, 0.0);
+	Vector3d v2(0.66, 0.33, 0.0);
+	Vector3d v3(1.0, 0.0, 0.0);
+
+	glgenCurve(v0, v1, v2, v3, .2);
+
+
+	//----------------------- code to draw objects --------------------------
+	// Rectangle Code
+	//glColor3f(red component, green component, blue component);
+	/*
+	glColor3f(1.0f, 0.0f, 0.0f);
+	glBegin(GL_POLYGON);                         // draw rectangle
+	//glVertex3f(x val, y val, z val (won't change the point because of the projection type));
+
+	glVertex3f(0.0f, 0.0f, 0.0f);               // bottom left corner of rectangle
+	glVertex3f(0.33f, 0.33f, 0.0f);
+	glVertex3f(0.66f, 0.33f, 0.0f);
+	glVertex3f(1.0f, 0.0f, 0.0f);
+	glEnd();
+	*/
+
+	/*
+	glColor3f(1.0f, 0.0f, 0.0f);                   // setting the color to pure red 90% for the rect
+	glBegin(GL_POLYGON);                         // draw rectangle
+	//glVertex3f(x val, y val, z val (won't change the point because of the projection type));
+	float farl =1.1f;
+	glVertex3f(-0.8f, 0.0f, farl);               // bottom left corner of rectangle
+	glVertex3f(-0.8f, 0.5f, farl);               // top left corner of rectangle
+	glVertex3f(0.0f, 0.5f, farl);               // top right corner of rectangle
+	glVertex3f(0.0f, 0.0f, farl);               // bottom right corner of rectangle
+	glEnd();
+	// Triangle Code
+	glColor3f(1.0f, 0.5f, 0.0f);                   // setting the color to orange for the triangle
+
+	float basey = -sqrt(0.48f);                  // height of triangle = sqrt(.8^2-.4^2)
+	glBegin(GL_POLYGON);
+	glVertex3f(.5f, 0.0f, 0.0f);                // top tip of triangle
+	glVertex3f(0.1f, basey, 0.0f);               // lower left corner of triangle
+	glVertex3f(0.9f, basey, 0.0f);               // lower right corner of triangle
+	glEnd();
+	//-----------------------------------------------------------------------
+	*/
+	glFlush();
+	glutSwapBuffers();                           // swap buffers (we earlier set double buffer)
+}
