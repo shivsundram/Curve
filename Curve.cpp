@@ -85,7 +85,7 @@ void myReshape(int w, int h) {
 
 
 	// glOrtho(-1, 1 + (w-400)/200.0 , -1 -(h-400)/200.0, 1, 1, -1); // resize type = add
-	 glOrtho(-w/400.0, w/400.0, -h/400.0, h/400.0, 2, -2); // resize type = center
+	 glOrtho(-w/400.0, w/400.0, -h/400.0, h/400.0, -10, 10); // resize type = center
 
 	//glOrtho(-4, 4, -4, 4, 2, -2);    // resize type = stretch
 
@@ -103,38 +103,139 @@ void initScene(){
 }
 
 
-Eigen::Vector3d deCasteljau(Eigen::Vector3d v0, Eigen::Vector3d v1, Eigen::Vector3d v2, Eigen::Vector3d v3, double u){
-	Vector3d result = pow((1 - u), 3)*v0 + 3 * pow((1 - u), 2)*u*v1 + 3 * (1 - u)*pow(u, 2)*v2 + pow(u, 3)*v3; 
-	return result; 
+Eigen::Vector3d curveInterp(Eigen::Vector3d v0, Eigen::Vector3d v1, Eigen::Vector3d v2, Eigen::Vector3d v3, double u){
+	
+	Vector3d A = v0*(1.0 - u) + v1*u;
+	Vector3d B = v1*(1.0 - u) + v2*u;
+	Vector3d C = v2*(1.0 - u) + v3*u;
+
+	Vector3d D = A*(1 - u) + B*u; 
+	Vector3d E = B*(1 - u) + C*u;
+
+	Vector3d p = D*(1 - u) + E*u;
+
+	return p; 
+}
+
+Eigen::Vector3d patchInterp(Patch patch, double u, double v){
+
+	Vector3d vcurve0 = curveInterp(patch.q[0], patch.q[1], patch.q[2], patch.q[3], u);
+	Vector3d vcurve1 = curveInterp(patch.q[4], patch.q[5], patch.q[6], patch.q[7], u);
+	Vector3d vcurve2 = curveInterp(patch.q[8], patch.q[9], patch.q[10], patch.q[11], u);
+	Vector3d vcurve3 = curveInterp(patch.q[12], patch.q[13], patch.q[14], patch.q[15], u);
+
+	Vector3d ucurve0 = curveInterp(patch.q[0], patch.q[4], patch.q[8], patch.q[12], v);
+	Vector3d ucurve1 = curveInterp(patch.q[1], patch.q[5], patch.q[9], patch.q[13], v);
+	Vector3d ucurve2 = curveInterp(patch.q[2], patch.q[6], patch.q[10], patch.q[14], v);
+	Vector3d ucurve3 = curveInterp(patch.q[3], patch.q[7], patch.q[11], patch.q[15], v);
+
+	Vector3d p = curveInterp(vcurve0, vcurve1, vcurve2, vcurve3, v);
+	return p; 
 }
 
 void glgenCurve(Eigen::Vector3d v0, Eigen::Vector3d v1, Eigen::Vector3d v2, Eigen::Vector3d v3, double u){
 	glBegin(GL_LINE_STRIP);
-	for (unsigned int i = 0; i <= (unsigned int) 1/u; ++i){
-		Vector3d result = deCasteljau(v0, v1, v2, v3, (double) (u*i));
-		glVertex3f(result[0], result[1], result[2]);		
+	for (unsigned int i = 0; i <= (unsigned int)1 / u; ++i){
+		Vector3d result = curveInterp(v0, v1, v2, v3, (double)(u*i));
+		glVertex3f(result[0], result[1], result[2]);
 	}
-	glEnd(); 
+	glEnd();
 
 }
 
-
+void glgenWirePatch(Patch patch, double u){
+	for (unsigned int i = 0; i < 4; ++i){
+		glgenCurve(patch.q[4 * i], patch.q[4 * i + 1], patch.q[4 * i + 2], patch.q[4 * i + 3], u);
+	}
+	
+	for (unsigned int i = 0; i < 4; ++i){
+		glgenCurve(patch.q[i], patch.q[4 + i], patch.q[8 + i], patch.q[12 + i], u);
+	}
+	
+}
 
 void display() // adapted from http://stackoverflow.com/questions/13159444/opengl-draw-polygon-with-gl-lines-and-angle-between-lines
 {
 	glClear(GL_COLOR_BUFFER_BIT);
 	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
+	//glMatrixMode(GL_MODELVIEW);
+	//glLoadIdentity();
+
+	glRotatef(2.0, 1.0, 0.0, 0.0);
+
+	vector<Eigen::Vector3d> tests; 
 
 	glColor3ub(255, 0, 0);
+
+	
 	Vector3d v0(0.0, 0.0, 0.0);
-	Vector3d v1(0.33, 0.33, 0.0);
-	Vector3d v2(0.66, 0.33, 0.0);
+	Vector3d v1(0.33, 0.0, 0.0);
+	Vector3d v2(0.66, 0.0, 0.0);
 	Vector3d v3(1.0, 0.0, 0.0);
+
+	tests.push_back(v0);
+	tests.push_back(v1);
+	tests.push_back(v2);
+	tests.push_back(v3);
+	
+
+	Vector3d v4(0.0, 0.0, .33);
+	Vector3d v5(0.33, 0.33, .33);
+	Vector3d v6(0.66, 0.33, .33);
+	Vector3d v7(1.0, 0.00, .33);
+
+	tests.push_back(v4);
+	tests.push_back(v5);
+	tests.push_back(v6);
+	tests.push_back(v7);
+	
+	Vector3d v8(0.0, 0.0, .66);
+	Vector3d v9(0.33, 0.33, .66);
+	Vector3d v10(0.66, 0.33, .66);
+	Vector3d v11(1.0, 0.0, .66);
+
+
+	tests.push_back(v8);
+	tests.push_back(v9);
+	tests.push_back(v10);
+	tests.push_back(v11);
+
+	Vector3d v12(0.0, 0.0, 1);
+	Vector3d v13(0.33, 0.0, 1);
+	Vector3d v14(0.66, 0.0, 1);
+	Vector3d v15(1.0, 0.0, 1);
+
+
+	tests.push_back(v12);
+	tests.push_back(v13);
+	tests.push_back(v14);
+	tests.push_back(v15);
+
 	glgenCurve(v0, v1, v2, v3, .01);
+	
+	glColor3f(1.0f, 0.0f, 0.0f);
+	glgenWirePatch(tests, .01);
+
+	/*
+	glColor3f(0.0f, 0.0f, 1.0f);
+	glBegin(GL_POINTS);
+
+	glVertex3d(0.0, 0.0, 0);
+	glVertex3d(0.33, 0.33, 0);
+	glVertex3d(0.66, 0.33, 0);
+	glVertex3d(1.0, 0.0, 0);
+
+
+	glVertex3d(0.0, 0.1, 1);
+	glVertex3d(0.33, 0.43, 1);
+	glVertex3d(0.66, 0.43, 1);
+	glVertex3d(1.0, 0.1, 1);
+	glEnd();
+	*/
+
 	glutSwapBuffers();
+
+
 }
 
 //****************************************************
@@ -267,7 +368,7 @@ void myDisplay() {
 	Vector3d v2(0.66, 0.33, 0.0);
 	Vector3d v3(1.0, 0.0, 0.0);
 
-	glgenCurve(v0, v1, v2, v3, .2);
+	//glgenCurve(v0, v1, v2, v3, .2);
 
 
 	//----------------------- code to draw objects --------------------------
@@ -309,3 +410,76 @@ void myDisplay() {
 	glFlush();
 	glutSwapBuffers();                           // swap buffers (we earlier set double buffer)
 }
+
+
+/*
+void glgenCurve(Eigen::Vector3d v0, Eigen::Vector3d v1, Eigen::Vector3d v2, Eigen::Vector3d v3, double u){
+glBegin(GL_LINE_STRIP);
+for (unsigned int i = 0; i <= (unsigned int) 1/u; ++i){
+Vector3d result = curveInterp(v0, v1, v2, v3, (double) (u*i));
+glVertex3f(result[0], result[1], result[2]);
+}
+glEnd();
+
+}
+
+void glgenWirePatch(Patch patch, double u){
+for (unsigned int i = 0; i < 4 ; ++i){
+glgenCurve(patch.q[4*i], patch.q[4*i + 1], patch.q[4*i + 2], patch.q[4*i + 3], u);
+}
+
+for (unsigned int i = 0; i < 4; ++i){
+glgenCurve(patch.q[i], patch.q[4  + i], patch.q[8 + i], patch.q[12 + i], u);
+}
+}
+*/
+
+
+/*
+Vector3d v0(0.0, 0.0, 0.0);
+Vector3d v1(0.33, 0.33, 0.0);
+Vector3d v2(0.66, 0.33, 0.0);
+Vector3d v3(1.0, 0.0, 0.0);
+
+tests.push_back(v0);
+tests.push_back(v1);
+tests.push_back(v2);
+tests.push_back(v3);
+
+
+Vector3d v4(0.0, 0.1, 1);
+Vector3d v5(0.33, 0.43, 1);
+Vector3d v6(0.66, 0.43, 1);
+Vector3d v7(1.0, 0.1, 1);
+
+
+
+tests.push_back(v4);
+tests.push_back(v5);
+tests.push_back(v6);
+tests.push_back(v7);
+
+
+Vector3d v8(0.0, 0.2, 2);
+Vector3d v9(0.33, 0.53, 2);
+Vector3d v10(0.66, 0.53, 2);
+Vector3d v11(1.0, 0.2, 2);
+
+
+tests.push_back(v8);
+tests.push_back(v9);
+tests.push_back(v10);
+tests.push_back(v11);
+
+Vector3d v12(0.0, 0.3, 3);
+Vector3d v13(0.33, 0.63, 3);
+Vector3d v14(0.66, 0.63, 3);
+Vector3d v15(1.0, 0.3, 3);
+
+
+tests.push_back(v12);
+tests.push_back(v13);
+tests.push_back(v14);
+tests.push_back(v15);
+
+*/
