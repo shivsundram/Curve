@@ -135,12 +135,32 @@ Eigen::Vector3d patchInterp(Patch patch, double u, double v){
 
 void glgenCurve(Eigen::Vector3d v0, Eigen::Vector3d v1, Eigen::Vector3d v2, Eigen::Vector3d v3, double u){
 	glBegin(GL_LINE_STRIP);
-	for (unsigned int i = 0; i <= (unsigned int)1 / u; ++i){
+	for (unsigned int i = 0; i <= (unsigned int) 1/u; ++i){
 		Vector3d result = curveInterp(v0, v1, v2, v3, (double)(u*i));
 		glVertex3f(result[0], result[1], result[2]);
 	}
 	glEnd();
 
+}
+
+void glUniformTesselate(Patch patch, unsigned int numdiv){
+	double step = numdiv; 
+	double stepsize = (double)(1 / step); 
+	for (unsigned int u = 0; u<numdiv; ++u){
+		for (unsigned int v = 0; v < numdiv; ++v){
+			Vector3d A = patchInterp(patch, u*stepsize, v*stepsize);
+			Vector3d B = patchInterp(patch, (1+u)*(stepsize), v*stepsize);
+			Vector3d C = patchInterp(patch, (1+u)*(stepsize), (1+v)*(stepsize));
+			Vector3d D = patchInterp(patch, u*stepsize, (1+v)*(stepsize));
+
+			glBegin(GL_LINE_STRIP);
+			glVertex3d(A[0], A[1], A[2]);
+			glVertex3d(B[0], B[1], B[2]);
+			glVertex3d(C[0], C[1], C[2]);
+			glVertex3d(D[0], D[1], D[2]);
+			glEnd();
+		}
+	}
 }
 
 void glgenWirePatch(Patch patch, double u){
@@ -158,10 +178,13 @@ void display() // adapted from http://stackoverflow.com/questions/13159444/openg
 {
 	glClear(GL_COLOR_BUFFER_BIT);
 	glMatrixMode(GL_PROJECTION);
+	glShadeModel(GL_FLAT);
 	//glMatrixMode(GL_MODELVIEW);
 	//glLoadIdentity();
 
-	glRotatef(2.0, 1.0, 0.0, 0.0);
+	glRotatef(3, 1.0, 0.0, 0.0);
+	glRotatef(.3, 0.0, 1.0, 0.0);
+	glRotatef(.7, 0.0, 1.0, 1.0);
 
 	vector<Eigen::Vector3d> tests; 
 
@@ -211,10 +234,13 @@ void display() // adapted from http://stackoverflow.com/questions/13159444/openg
 	tests.push_back(v14);
 	tests.push_back(v15);
 
-	glgenCurve(v0, v1, v2, v3, .01);
+	//glgenCurve(v0, v1, v2, v3, .01);
 	
 	glColor3f(1.0f, 0.0f, 0.0f);
-	glgenWirePatch(tests, .01);
+
+	glUniformTesselate(tests, 20);
+
+	//glgenWirePatch(tests, .01);
 
 	/*
 	glColor3f(0.0f, 0.0f, 1.0f);
