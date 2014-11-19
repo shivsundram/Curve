@@ -198,16 +198,14 @@ void glUniformTesselate(Patch patch, unsigned int numdiv){
 	double stepsize = (double)(1 / step); 
 	for (unsigned int u = 0; u<numdiv; ++u){
 		for (unsigned int v = 0; v < numdiv; ++v){
-			Vector3d A = patchInterp(patch, u*stepsize, v*stepsize).point;
-			//cout << patchInterp(patch, u*stepsize, v*stepsize).normal << endl;
-			Vector3d B = patchInterp(patch, (1+u)*(stepsize), v*stepsize).point;
-			//cout << patchInterp(patch, (1 + u)*(stepsize), v*stepsize).normal << endl; ;
-			Vector3d C = patchInterp(patch, (1+u)*(stepsize), (1+v)*(stepsize)).point;
-			Vector3d D = patchInterp(patch, u*stepsize, (1+v)*(stepsize)).point;
+			Localinfo A = patchInterp(patch, u*stepsize, v*stepsize);
+			Localinfo B = patchInterp(patch, (1+u)*(stepsize), v*stepsize);
+			Localinfo C = patchInterp(patch, (1+u)*(stepsize), (1+v)*(stepsize));
+			Localinfo D = patchInterp(patch, u*stepsize, (1 + v)*(stepsize)); 
 
 	
-			Vector3d first = B - A; 
-			Vector3d second = C - A;
+			Vector3d first = B.point - A.point; 
+			Vector3d second = C.point - A.point;
 
 			Vector3d normal = first.cross(second);
 			normal.normalize(); 
@@ -216,11 +214,17 @@ void glUniformTesselate(Patch patch, unsigned int numdiv){
 
 			//glBegin(GL_LINE_STRIP);
 			glBegin(GL_POLYGON);
-			glNormal3f(normal[0], normal[1], normal[2]);
-			glVertex3d(A[0], A[1], A[2]);
-			glVertex3d(B[0], B[1], B[2]);
-			glVertex3d(C[0], C[1], C[2]);
-			glVertex3d(D[0], D[1], D[2]);
+			glNormal3d(A.normal[0], A.normal[1], A.normal[2]);
+			glVertex3d(A.point[0], A.point[1], A.point[2]);
+
+			glNormal3d(B.normal[0],B.normal[1], B.normal[2]);
+			glVertex3d(B.point[0], B.point[1], B.point[2]);
+
+			glNormal3d(C.normal[0], C.normal[1], C.normal[2]);
+			glVertex3d(C.point[0], C.point[1], C.point[2]);
+
+			glNormal3d(D.normal[0], D.normal[1], D.normal[2]);
+			glVertex3d(D.point[0], D.point[1], D.point[2]);
 			glEnd();
 		}
 	}
