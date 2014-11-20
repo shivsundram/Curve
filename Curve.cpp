@@ -2,13 +2,15 @@
 //
 //andrey, leave stdafx.h out of your code. this is a stupid windows thing
 #include "stdafx.h"
-
+// Curve.cpp : Defines the entry point for the console application.
+//
+//andrey, leave stdafx.h out of your code. this is a stupid windows thing
 
 #include <vector>
 #include <iostream>
 #include <cmath>
 #include <stdio.h>
-#include <stdlib.h> 
+#include <stdlib.h>
 #include <string>
 #include <fstream>
 #include <iostream>
@@ -19,7 +21,13 @@
 #include <vector>
 #include <time.h>
 #include <limits>
-using namespace std;
+#include <list>
+#include <queue>
+
+
+#include "Shape.h"
+// #include "Shape.cpp"
+
 
 
 #ifdef _WIN32
@@ -36,37 +44,12 @@ using namespace std;
 #include <GL/glu.h>
 #endif
 
+
 #include <Eigen/Dense>
-#include <Eigen/StdVector>
+
+using namespace std;
 using namespace Eigen;
 
-class Localinfo{
-public: 
-	Eigen::Vector3d point;
-	Eigen::Vector3d normal; 
-
-	Localinfo(Vector3d, Vector3d);
-};
-
-Localinfo::Localinfo(Vector3d p, Vector3d n){
-	point = p;
-	normal = n;
-}
-
-class Localinfo2{
-public:
-	Eigen::Vector3d point;
-	Eigen::Vector3d normalu;
-	Eigen::Vector3d normalv;
-
-	Localinfo2(Vector3d, Vector3d, Vector3d);
-};
-
-Localinfo2::Localinfo2(Vector3d p, Vector3d nu, Vector3d nv){
-	point = p;
-	normalu = nu;
-	normalv = nv; 
-}
 
 class Viewport {
 public:
@@ -76,21 +59,118 @@ public:
 
 class Patch{
 public:
-	std::vector <Eigen::Vector3d> q;
-	Patch(std::vector <Eigen::Vector3d> q); 
+	vector <Vector3d> q;
+	Patch(vector <Vector3d> q);
 };
 
-Patch::Patch(std::vector <Eigen::Vector3d> q1){
-	q = q1; 
+Patch::Patch(vector <Vector3d> q1){
+	q = q1;
 }
 
 //****************************************************
 // Global Variables
 //****************************************************
 Viewport    viewport;
-int patches; 
-vector <Eigen::Vector3d> coordinates;
+int numPatches;
+vector <Vector3d> coordinates;
 vector <Patch> bezpatches;
+vector <Shape*> faces;
+
+int rotateX = 0;
+int rotateY = 0;
+double tessArg = 0.1;
+double translateX = 0;
+double translateY = 0;
+double scale = 1;
+
+bool isWireframe = false;
+bool isSmoothShading = false;
+
+const double TRANSLATE_DELTA = 0.04;
+const int ROTATE_DELTA = 3;
+const double SCALE_DELTA = 0.5;
+
+
+
+void mySpecialKeys(int key, int x, int y) {
+
+
+
+	int mod = glutGetModifiers();
+	bool isShift = false;
+
+	switch (mod) {
+	case GLUT_ACTIVE_SHIFT:
+		isShift = true;
+		break;
+	}
+
+
+	switch (key) {
+
+	case GLUT_KEY_LEFT:
+		if (isShift) {
+			translateX -= TRANSLATE_DELTA;
+		}
+		else {
+			rotateY -= ROTATE_DELTA;
+		}
+		break;
+	case GLUT_KEY_RIGHT:
+		if (isShift) {
+			translateX += TRANSLATE_DELTA;
+		}
+		else {
+			rotateY += ROTATE_DELTA;
+		}
+		break;
+	case GLUT_KEY_UP:
+		if (isShift) {
+			translateY += TRANSLATE_DELTA;
+		}
+		else {
+			rotateX -= ROTATE_DELTA;
+		}
+		break;
+	case GLUT_KEY_DOWN:
+		if (isShift) {
+			translateY -= TRANSLATE_DELTA;
+		}
+		else {
+			rotateX += ROTATE_DELTA;
+		}
+		break;
+	default:
+		cout << "Special key " << key << endl;
+	}
+
+	glutPostRedisplay();
+}
+
+//---+----3----+----2----+----1----+---<>---+----1----+----2----+----3----+----4
+
+void myKeyboard(unsigned char key, int x, int y) {
+	switch (key) {
+	case '+':
+		scale /= SCALE_DELTA;
+		break;
+	case '-':
+		scale *= SCALE_DELTA;
+		break;
+	case 'w':
+		isWireframe = isWireframe ? false : true;
+		break;
+	case 's':
+		isSmoothShading = isSmoothShading ? false : true;
+		break;
+	default:
+		cout << "myKeyboard " << key << endl;
+	}
+
+	glutPostRedisplay();
+}
+
+
 
 //****************************************************
 // reshape viewport if the window is resized
@@ -108,10 +188,8 @@ void myReshape(int w, int h) {
 
 	//----------- setting the projection -------------------------
 	// glOrtho sets left, right, bottom, top, zNear, zFar of the chord system
-
-
 	// glOrtho(-1, 1 + (w-400)/200.0 , -1 -(h-400)/200.0, 1, 1, -1); // resize type = add
-	 glOrtho(-w/400.0, w/400.0, -h/400.0, h/400.0, -10, 10); // resize type = center
+	glOrtho(-w / 400.0, w / 400.0, -h / 400.0, h / 400.0, 2, -2); // resize type = center
 
 	//glOrtho(-4, 4, -4, 4, 2, -2);    // resize type = stretch
 
@@ -129,38 +207,40 @@ void initScene(){
 }
 
 
-Eigen::Vector3d curveInterpbad(Eigen::Vector3d v0, Eigen::Vector3d v1, Eigen::Vector3d v2, Eigen::Vector3d v3, double u){
-	
-	Vector3d A = v0*(1.0 - u) + v1*u;
-	Vector3d B = v1*(1.0 - u) + v2*u;
-	Vector3d C = v2*(1.0 - u) + v3*u;
-
-	Vector3d D = A*(1 - u) + B*u; 
-	Vector3d E = B*(1 - u) + C*u;
-
-	Vector3d p = D*(1 - u) + E*u;
-
-	return p; 
+Vector3d deCasteljau(const Vector3d& v0, const Vector3d& v1, const Vector3d& v2, const Vector3d& v3, double u){
+	return pow((1 - u), 3)*v0 + 3 * pow((1 - u), 2)*u*v1 + 3 * (1 - u)*pow(u, 2)*v2 + pow(u, 3)*v3;
 }
 
 
-Localinfo curveInterp(Eigen::Vector3d v0, Eigen::Vector3d v1, Eigen::Vector3d v2, Eigen::Vector3d v3, double u){
-
-	Vector3d A = v0*(1.0 - u) + v1*u;
-	Vector3d B = v1*(1.0 - u) + v2*u;
-	Vector3d C = v2*(1.0 - u) + v3*u;
-
-	Vector3d D = A*(1 - u) + B*u;
-	Vector3d E = B*(1 - u) + C*u;
-
-	Vector3d p = D*(1 - u) + E*u;
-
-	Vector3d np = 3 * (E - D);
-
-	return Localinfo(p, np);
+void glgenCurve(const Vector3d& v0, const Vector3d& v1, const Vector3d& v2, const Vector3d& v3, double u){
+	glBegin(GL_LINE_STRIP);
+	for (unsigned int i = 0; i <= (unsigned int)1 / u; ++i){
+		Vector3d result = deCasteljau(v0, v1, v2, v3, (double)(u*i));
+		glVertex3f(result[0], result[1], result[2]);
+	}
+	glEnd();
 }
 
-Localinfo patchInterp(Patch patch, double u, double v){
+
+
+LocalInfo curveInterp(Vector3d v0, Vector3d v1, Vector3d v2, Vector3d v3, double u) {
+	Vector3d A = v0 * (1.0 - u) + v1 * u;
+	Vector3d B = v1 * (1.0 - u) + v2 * u;
+	Vector3d C = v2 * (1.0 - u) + v3 * u;
+
+	Vector3d D = A * (1.0 - u) + B * u;
+	Vector3d E = B * (1.0 - u) + C * u;
+
+	Vector3d p = D * (1.0 - u) + E * u;
+
+	Vector3d np = 3.0 * (E - D);
+
+	return LocalInfo(p, np);
+}
+
+
+
+LocalInfo patchInterp(Patch patch, double u, double v) {
 
 	Vector3d vcurve0 = curveInterp(patch.q[0], patch.q[1], patch.q[2], patch.q[3], u).point;
 	Vector3d vcurve1 = curveInterp(patch.q[4], patch.q[5], patch.q[6], patch.q[7], u).point;
@@ -172,172 +252,256 @@ Localinfo patchInterp(Patch patch, double u, double v){
 	Vector3d ucurve2 = curveInterp(patch.q[2], patch.q[6], patch.q[10], patch.q[14], v).point;
 	Vector3d ucurve3 = curveInterp(patch.q[3], patch.q[7], patch.q[11], patch.q[15], v).point;
 
-	Localinfo infv = curveInterp(vcurve0, vcurve1, vcurve2, vcurve3, v);
-	Localinfo infu = curveInterp(ucurve0, ucurve1, ucurve2, ucurve3, u);
-	Vector3d p = infv.point; 
+	LocalInfo infv = curveInterp(vcurve0, vcurve1, vcurve2, vcurve3, v);
+	LocalInfo infu = curveInterp(ucurve0, ucurve1, ucurve2, ucurve3, u);
+
+	Vector3d p = infu.point;
 	Vector3d dPdv = infv.normal;
 	Vector3d dPdu = infu.normal;
-	
+
 	Vector3d n = dPdu.cross(dPdv);
+	n.normalize();
 
-	return Localinfo(p, n);
+	return LocalInfo(p, n);
 }
 
-void glgenCurve(Eigen::Vector3d v0, Eigen::Vector3d v1, Eigen::Vector3d v2, Eigen::Vector3d v3, double u){
-	glBegin(GL_POLYGON);
-	for (unsigned int i = 0; i <= (unsigned int) 1/u; ++i){
-		Vector3d result = curveInterpbad(v0, v1, v2, v3, (double)(u*i));
-		glVertex3f(result[0], result[1], result[2]);
-	}
-	glEnd();
 
-}
+void uniformTesselate(Patch patch, double step){
+	int numdiv = 1.0 / step;
+	for (int u = 0; u < numdiv; ++u){
+		for (int v = 0; v < numdiv; ++v){
+			LocalInfo A = patchInterp(patch, u*step, v*step);
+			LocalInfo B = patchInterp(patch, (1 + u) * step, v * step);
+			LocalInfo C = patchInterp(patch, (1 + u) * step, (1 + v) * step);
+			LocalInfo D = patchInterp(patch, u*step, (1 + v) * step);
 
-void glUniformTesselate(Patch patch, unsigned int numdiv){
-	double step = numdiv; 
-	double stepsize = (double)(1 / step); 
-	for (unsigned int u = 0; u<numdiv; ++u){
-		for (unsigned int v = 0; v < numdiv; ++v){
-			Localinfo A = patchInterp(patch, u*stepsize, v*stepsize);
-			Localinfo B = patchInterp(patch, (1+u)*(stepsize), v*stepsize);
-			Localinfo C = patchInterp(patch, (1+u)*(stepsize), (1+v)*(stepsize));
-			Localinfo D = patchInterp(patch, u*stepsize, (1 + v)*(stepsize)); 
-
-	
-			Vector3d first = B.point - A.point; 
-			Vector3d second = C.point - A.point;
-
-			Vector3d normal = first.cross(second);
-			normal.normalize(); 
-			
-
-
-			//glBegin(GL_LINE_STRIP);
-			glBegin(GL_POLYGON);
-			glNormal3d(A.normal[0], A.normal[1], A.normal[2]);
-			glVertex3d(A.point[0], A.point[1], A.point[2]);
-
-			glNormal3d(B.normal[0],B.normal[1], B.normal[2]);
-			glVertex3d(B.point[0], B.point[1], B.point[2]);
-
-			glNormal3d(C.normal[0], C.normal[1], C.normal[2]);
-			glVertex3d(C.point[0], C.point[1], C.point[2]);
-
-			glNormal3d(D.normal[0], D.normal[1], D.normal[2]);
-			glVertex3d(D.point[0], D.point[1], D.point[2]);
-			glEnd();
+			Quad* q = new Quad(A.point, B.point, C.point, D.point, A.normal, B.normal, C.normal, D.normal);
+			faces.push_back(q);
 		}
 	}
 }
 
-void glgenWirePatch(Patch patch, double u){
-	for (unsigned int i = 0; i < 4; ++i){
-		glgenCurve(patch.q[4 * i], patch.q[4 * i + 1], patch.q[4 * i + 2], patch.q[4 * i + 3], u);
-	}
-	
-	for (unsigned int i = 0; i < 4; ++i){
-		glgenCurve(patch.q[i], patch.q[4 + i], patch.q[8 + i], patch.q[12 + i], u);
-	}
-	
+
+class PatchTri{
+public: 
+	Vector3d vertexA; 
+	Vector3d vertexB;
+	Vector3d vertexC;
+	PatchTri(const Vector3d&, const Vector3d&, const Vector3d&);
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+};
+
+PatchTri::PatchTri(const Vector3d& A, const Vector3d& B, const Vector3d& C){
+	vertexA = A; 
+	vertexB = B; 
+	vertexC = C; 
 }
 
-void display() // adapted from http://stackoverflow.com/questions/13159444/opengl-draw-polygon-with-gl-lines-and-angle-between-lines
-{
-	glClear(GL_COLOR_BUFFER_BIT);
-	glMatrixMode(GL_PROJECTION);
-	glShadeModel(GL_SMOOTH);
+class testResults{
+public:
+	bool flatEnough; 
+	vector <PatchTri> newTriangles; 
+	testResults(bool isFlat){ flatEnough = isFlat;}
+	testResults(bool isFlat, vector <PatchTri> triangles);
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+};
+
+testResults::testResults(bool isFlat, vector <PatchTri> triangles){
+	flatEnough = isFlat;
+	newTriangles = triangles;
+}
+
+testResults edgeTests(Patch patch,const PatchTri& tri, double error){
+	//pass in triangle u,v values
+	//		C		
+	//     / \
+	//	  /   \
+	//   A --- B
 	
+	//evaluate corners of triangle
+	Vector3d A = patchInterp(patch, tri.vertexA[0], tri.vertexA[1]).point;
+	Vector3d B = patchInterp(patch, tri.vertexB[0], tri.vertexB[1]).point;
+	Vector3d C = patchInterp(patch, tri.vertexC[0], tri.vertexC[1]).point;
+
+	//calculate midpoints of triangle by averaging evaluated corners
+	Vector3d Trileft = (A + C) / 2; 
+	Vector3d Triright = (B + C) / 2;
+	Vector3d Tribottom = (A + B) / 2;
+	Vector3d Tricenter = (A + B+ C) / 3;
+
+	//generate midpoint u,v values of triangle for evaluation
+	Vector3d left = (tri.vertexA + tri.vertexC) / 2;
+	Vector3d right = (tri.vertexB + tri.vertexC) / 2;
+	Vector3d bottom = (tri.vertexA + tri.vertexB) / 2;
+	Vector3d center = (tri.vertexA + tri.vertexB + tri.vertexC) / 3;
+
+	//evaluate at midpoints using u,v values
+	Vector3d Bezleft =  patchInterp(patch, left[0], left[1]).point;
+	Vector3d Bezright = patchInterp(patch, right[0], right[1]).point;
+	Vector3d Bezbottom = patchInterp(patch, bottom[0], bottom[1]).point;
+	Vector3d Bezcenter = patchInterp(patch, center[0], center[1]).point;
+
+	//do tests, comparing triangle midpoints(TRI) and evaluated midpoints (Bez)
+	bool lefttest = (Trileft - Bezleft).norm() < error ;
+	bool righttest = (Trileft - Bezleft).norm() < error;
+	bool bottomtest = (Trileft - Bezleft).norm() < error;
+	bool centertest = (Trileft - Bezleft).norm() < error;
+	
+	
+	vector <PatchTri> newTriangles;
+	//case 1
+	if (lefttest && righttest && bottomtest){
+		return testResults(true);
+		cout << "done" << endl;
+	}
+	
+	//case 2
+	else if (!lefttest && righttest && bottomtest){
+		newTriangles.push_back(PatchTri(tri.vertexA, tri.vertexB, left));
+		newTriangles.push_back(PatchTri(tri.vertexB, tri.vertexC, left));
+	}
+
+	//case 3
+	else if (!lefttest && !righttest && bottomtest ){
+		newTriangles.push_back(PatchTri(tri.vertexA, tri.vertexB, left));
+		newTriangles.push_back(PatchTri(tri.vertexB,right, left));
+		newTriangles.push_back(PatchTri(right, tri.vertexC, left));
+	}
+
+	//case 4
+	else if (!lefttest && !righttest && !bottomtest){
+		newTriangles.push_back(PatchTri(tri.vertexA, bottom, left));
+		newTriangles.push_back(PatchTri(bottom, right, left));
+		newTriangles.push_back(PatchTri(bottom, tri.vertexB, right));
+		newTriangles.push_back(PatchTri(left, right, tri.vertexC));
+	}
+
+	//case 5
+	/*
+	else if (lefttest && righttest && bottomtest && !centertest){
+		newTriangles.push_back(PatchTri(tri.vertexA, tri.vertexB, center));
+		newTriangles.push_back(PatchTri(tri.vertexB, tri.vertexC, center));
+		newTriangles.push_back(PatchTri(tri.vertexA, center, tri.vertexC));
+	}
+	//case 6
+	else if (!lefttest && righttest && bottomtest && !centertest){
+		newTriangles.push_back(PatchTri(tri.vertexA, tri.vertexB, center));
+		newTriangles.push_back(PatchTri(tri.vertexB, tri.vertexC, center));
+		newTriangles.push_back(PatchTri(tri.vertexA, center, left));
+		newTriangles.push_back(PatchTri(left, center, tri.vertexC));
+	}
+
+	//case 7
+	else if (!lefttest && !righttest && bottomtest && !centertest){
+		newTriangles.push_back(PatchTri(tri.vertexA, tri.vertexB, center));
+
+		newTriangles.push_back(PatchTri(tri.vertexA, center, left));
+		newTriangles.push_back(PatchTri(tri.vertexA, center, left));
+
+		newTriangles.push_back(PatchTri(tri.vertexA, center, left));
+		newTriangles.push_back(PatchTri(left, center, tri.vertexC));
+	}
+
+	//case 8
+	*/
+	else{
+		cout << "eh" << endl;
+		return testResults(true);
+	}
+	cout << "whaddup" << endl; 
+	return testResults(false, newTriangles);
+
+}
+
+void adaptiveTriangulate(Patch patch, double error){
+	std::queue<PatchTri> queue;
+	vector<PatchTri> triangulation; 
+
+	//create triangle tri,s add to patch tri vector, run tesselation, passing in 
+	PatchTri first(Vector3d(0, 0,0), Vector3d(1, 0,0), Vector3d(0, 1,0)); 
+	PatchTri second(Vector3d(1, 0,0), Vector3d(1, 1,0), Vector3d(0, 1,0));
+
+	queue.push(first);
+	queue.push(second);
+
+	while (!queue.empty()){
+		PatchTri popped = queue.front();
+		testResults result = edgeTests(patch, popped, error);
+		
+		if (result.flatEnough){
+			queue.pop();
+			triangulation.push_back(popped);
+		}
+		else{
+			for (unsigned int i = 0; i < result.newTriangles.size(); ++i){
+				queue.pop();
+				queue.push(result.newTriangles[i]);
+				cout << "popped" << endl; 
+			}
+		}
+	}
+
+	for (unsigned int i=0; i < triangulation.size(); ++i){
+		PatchTri first = triangulation[i];
+		LocalInfo A = patchInterp(patch, first.vertexA[0], first.vertexA[1]);
+		LocalInfo B = patchInterp(patch, first.vertexB[0], first.vertexB[1]);
+		LocalInfo C = patchInterp(patch, first.vertexC[0], first.vertexC[1]);
+
+		Triangle* t = new Triangle(A.point, B.point, C.point, A.normal, B.normal, C.normal);
+		faces.push_back(t);
+	}
+}
+
+
+void display() {
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+
+
 	glEnable(GL_LIGHTING);
 	glEnable(GL_LIGHT0);
 
 	GLfloat lightColor0[] = { 0.5f, 0.5f, 0.5f, 1.0f }; //Color (0.5, 0.5, 0.5)
-	GLfloat lightPos0[] = { 4.0f, 0.0f, 8.0f, 1.0f }; //Positioned at (4, 0, 8)
+	GLfloat lightPos0[] = { 4.0f, 4.0f, -4.0f, 1.0f }; //Positioned at (4, 4, 4)
 	glLightfv(GL_LIGHT0, GL_DIFFUSE, lightColor0);
 	glLightfv(GL_LIGHT0, GL_POSITION, lightPos0);
 
-	//glMatrixMode(GL_MODELVIEW);
-	//glLoadIdentity();
 
-	glRotatef(1, 1.0, 0.0, 0.0);
-	//glRotatef(.3, 0.0, 1.0, 0.0);
-	//glRotatef(.7, 0.0, 1.0, 1.0);
+	if (isSmoothShading) {
+		glShadeModel(GL_SMOOTH);
+	}
+	else {
+		glShadeModel(GL_FLAT);
+	}
 
-	vector<Eigen::Vector3d> tests; 
-
-	glColor3ub(255, 0, 0);
-
-	
-	Vector3d v0(0.0, 0.0, 0.0);
-	Vector3d v1(0.33, 0.0, 0.0);
-	Vector3d v2(0.66, 0.0, 0.0);
-	Vector3d v3(1.0, 0.0, 0.0);
-
-	tests.push_back(v0);
-	tests.push_back(v1);
-	tests.push_back(v2);
-	tests.push_back(v3);
-	
-
-	Vector3d v4(0.0, 0.0, .33);
-	Vector3d v5(0.33, 0.33, .33);
-	Vector3d v6(0.66, 0.33, .33);
-	Vector3d v7(1.0, 0.00, .33);
-
-	tests.push_back(v4);
-	tests.push_back(v5);
-	tests.push_back(v6);
-	tests.push_back(v7);
-	
-	Vector3d v8(0.0, 0.0, .66);
-	Vector3d v9(0.33, 0.33, .66);
-	Vector3d v10(0.66, 0.33, .66);
-	Vector3d v11(1.0, 0.0, .66);
+	if (isWireframe) {
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		glDisable(GL_LIGHTING);
+		glDisable(GL_LIGHT0);
+	}
+	else {
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	}
 
 
-	tests.push_back(v8);
-	tests.push_back(v9);
-	tests.push_back(v10);
-	tests.push_back(v11);
+	// glColor3ub(255, 255, 255);
 
-	Vector3d v12(0.0, 0.0, 1);
-	Vector3d v13(0.33, 0.0, 1);
-	Vector3d v14(0.66, 0.0, 1);
-	Vector3d v15(1.0, 0.0, 1);
+	glPushMatrix();
 
+	glTranslated(translateX, translateY, 0);
+	glRotated(rotateX, 1, 0, 0);  // Up and down arrow keys 'tip' view.
+	glRotated(rotateY, 0, 1, 0);  // Right/left arrow keys 'turn' view.
+	glScaled(scale, scale, scale);
+	for (int i = 0; i < faces.size(); i++) {
+		faces[i]->draw();
+	}
 
-	tests.push_back(v12);
-	tests.push_back(v13);
-	tests.push_back(v14);
-	tests.push_back(v15);
+	glPopMatrix();
 
-	//glgenCurve(v0, v1, v2, v3, .01);
-	
-	glColor3f(1.0f, 0.0f, 0.0f);
-
-	glUniformTesselate(tests, 20);
-
-	//glgenWirePatch(tests, .01);
-
-	/*
-	glColor3f(0.0f, 0.0f, 1.0f);
-	glBegin(GL_POINTS);
-
-	glVertex3d(0.0, 0.0, 0);
-	glVertex3d(0.33, 0.33, 0);
-	glVertex3d(0.66, 0.33, 0);
-	glVertex3d(1.0, 0.0, 0);
-
-
-	glVertex3d(0.0, 0.1, 1);
-	glVertex3d(0.33, 0.43, 1);
-	glVertex3d(0.66, 0.43, 1);
-	glVertex3d(1.0, 0.1, 1);
-	glEnd();
-	*/
-
+	glFlush();
 	glutSwapBuffers();
-
-
 }
 
 //****************************************************
@@ -356,7 +520,7 @@ void myFrameMove() {
 // the usual stuff, nothing exciting here
 //****************************************************
 
-void parseLine(const std::string& line) {
+void parseLine(const string& line) {
 	istringstream iss(line);
 	vector<string> tokens((istream_iterator<string>(iss)), istream_iterator<string>());
 
@@ -365,223 +529,98 @@ void parseLine(const std::string& line) {
 		return;
 	}
 	else if (tokens.size() == 1) {
-		patches = atoi(tokens[0].c_str());
+		numPatches = atoi(tokens[0].c_str());
 	}
-
 	else if (tokens.size() == 12) {
 		for (int i = 0; i < 4; i++){
-			coordinates.push_back(Eigen::Vector3d(atof(tokens[3 * i+0].c_str()), atof(tokens[3 * i + 1].c_str()), atof(tokens[3 * i + 2].c_str())));
-		}	
+			coordinates.push_back(Vector3d(atof(tokens[3 * i + 0].c_str()), atof(tokens[3 * i + 1].c_str()), atof(tokens[3 * i + 2].c_str())));
+		}
 	}
 }
 
-const char* filename;
+
+
 int main(int argc, char *argv[]) {
-	
-	std::ifstream fin("test.bez");
-	std::string line;
- 
-	if (!fin.good())
-	{
-		cout << "bad file name" << endl; 
-	}
-	else{
-		//first load all text file data into "coordinates" buffer during parse stage. 
-		//after parsing is done, transfer data from buffer into patches, and then clumb all patches together in "bezpatches" vector
+
+	ifstream fin;
+	string line;
+
+	if (argc >= 2) {
+
+		if (argc >= 3) {
+			tessArg = atof(argv[2]);
+		}
+
+		fin.open(argv[1]);
+
+
+		if (!fin.good()) {
+			cout << "File \"" << argv[1] << "\" does not exists" << endl;
+			return 1;
+		}
+
+		//after parsing is done, transfer data from buffer into numPatches, and then clumb all numPatches together in "bezpatches" vector
 		while (getline(fin, line)) {
+
 			try {
 				parseLine(line);
-
 			}
 			catch (invalid_argument& e) {
 				cerr << e.what() << endl;
 			}
 		}
+
+		fin.close();
 	}
-	cout << patches << endl; 
-	for (int j = 0; j < patches; j++){
-		std::vector <Eigen::Vector3d> curve;
+	else {
+		cout << "Invalid argument." << endl;
+	}
+
+
+	cout << numPatches << endl;
+	for (int j = 0; j < numPatches; j++){
+		vector <Vector3d> curve;
 		for (int i = 0; i < 16; i++){
 			curve.push_back(coordinates[j * 16 + i]);
 		}
-		Patch next(curve); 
-		//just for testing
-		//cout << "new patch" << endl;
-		//for (int k = 0; k < 16;  k++){
-		//	cout << curve[k] << endl;
-		//}
+		Patch next(curve);
+
 		bezpatches.push_back(next);
 	}
 
-
+	for (int i = 0; i < numPatches; i++) {
+		//uniformTesselate(bezpatches[i], tessArg);
+		adaptiveTriangulate(bezpatches[i], tessArg);
+	}
 
 
 	glutInit(&argc, argv);
 
-	//This tells glut to use a double-buffered window with red, green, and blue channels 
-	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
+	//This tells glut to use a double-buffered window with red, green, and blue channels
+	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
+
 
 	// Initalize theviewport size
-	viewport.w = 400;
-	viewport.h = 400;
+	viewport.w = 800;
+	viewport.h = 800;
 
 	//The size and position of the window
 	glutInitWindowSize(viewport.w, viewport.h);
 	glutInitWindowPosition(0, 0);
-	glutCreateWindow("CS184!");
+	glutCreateWindow("CS184 Assignment 3");
 
 	initScene();                                 // quick function to set up scene
 
+	glEnable(GL_DEPTH_TEST);
+
+
 	glutDisplayFunc(display);                  // function to run when its time to draw something
 	glutReshapeFunc(myReshape);                  // function to run when the window gets resized
+	glutKeyboardFunc(myKeyboard);
+	glutSpecialFunc(mySpecialKeys);
 	glutIdleFunc(myFrameMove);                   // function to run when not handling any other task
 	glutMainLoop();                              // infinite loop that will keep drawing and resizing and whatever else
 
 	return 0;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-//for some reason, this function is shitty and juut doesn't work
-//***************************************************
-// function that does the actual drawing
-//***************************************************
-void myDisplay() {
-
-	glClear(GL_COLOR_BUFFER_BIT);                // clear the color buffer (sets everything to black)
-
-	glMatrixMode(GL_MODELVIEW);                  // indicate we are specifying camera transformations
-	glLoadIdentity();                            // make sure transformation is "zero'd"
-
-
-	Vector3d v0(0.0, 0.0, 0.0);
-	Vector3d v1(0.33, 0.33, 0.0);
-	Vector3d v2(0.66, 0.33, 0.0);
-	Vector3d v3(1.0, 0.0, 0.0);
-
-	//glgenCurve(v0, v1, v2, v3, .2);
-
-
-	//----------------------- code to draw objects --------------------------
-	// Rectangle Code
-	//glColor3f(red component, green component, blue component);
-	/*
-	glColor3f(1.0f, 0.0f, 0.0f);
-	glBegin(GL_POLYGON);                         // draw rectangle
-	//glVertex3f(x val, y val, z val (won't change the point because of the projection type));
-
-	glVertex3f(0.0f, 0.0f, 0.0f);               // bottom left corner of rectangle
-	glVertex3f(0.33f, 0.33f, 0.0f);
-	glVertex3f(0.66f, 0.33f, 0.0f);
-	glVertex3f(1.0f, 0.0f, 0.0f);
-	glEnd();
-	*/
-
-	/*
-	glColor3f(1.0f, 0.0f, 0.0f);                   // setting the color to pure red 90% for the rect
-	glBegin(GL_POLYGON);                         // draw rectangle
-	//glVertex3f(x val, y val, z val (won't change the point because of the projection type));
-	float farl =1.1f;
-	glVertex3f(-0.8f, 0.0f, farl);               // bottom left corner of rectangle
-	glVertex3f(-0.8f, 0.5f, farl);               // top left corner of rectangle
-	glVertex3f(0.0f, 0.5f, farl);               // top right corner of rectangle
-	glVertex3f(0.0f, 0.0f, farl);               // bottom right corner of rectangle
-	glEnd();
-	// Triangle Code
-	glColor3f(1.0f, 0.5f, 0.0f);                   // setting the color to orange for the triangle
-
-	float basey = -sqrt(0.48f);                  // height of triangle = sqrt(.8^2-.4^2)
-	glBegin(GL_POLYGON);
-	glVertex3f(.5f, 0.0f, 0.0f);                // top tip of triangle
-	glVertex3f(0.1f, basey, 0.0f);               // lower left corner of triangle
-	glVertex3f(0.9f, basey, 0.0f);               // lower right corner of triangle
-	glEnd();
-	//-----------------------------------------------------------------------
-	*/
-	glFlush();
-	glutSwapBuffers();                           // swap buffers (we earlier set double buffer)
-}
-
-
-/*
-void glgenCurve(Eigen::Vector3d v0, Eigen::Vector3d v1, Eigen::Vector3d v2, Eigen::Vector3d v3, double u){
-glBegin(GL_LINE_STRIP);
-for (unsigned int i = 0; i <= (unsigned int) 1/u; ++i){
-Vector3d result = curveInterp(v0, v1, v2, v3, (double) (u*i));
-glVertex3f(result[0], result[1], result[2]);
-}
-glEnd();
-
-}
-
-void glgenWirePatch(Patch patch, double u){
-for (unsigned int i = 0; i < 4 ; ++i){
-glgenCurve(patch.q[4*i], patch.q[4*i + 1], patch.q[4*i + 2], patch.q[4*i + 3], u);
-}
-
-for (unsigned int i = 0; i < 4; ++i){
-glgenCurve(patch.q[i], patch.q[4  + i], patch.q[8 + i], patch.q[12 + i], u);
-}
-}
-*/
-
-
-/*
-Vector3d v0(0.0, 0.0, 0.0);
-Vector3d v1(0.33, 0.33, 0.0);
-Vector3d v2(0.66, 0.33, 0.0);
-Vector3d v3(1.0, 0.0, 0.0);
-
-tests.push_back(v0);
-tests.push_back(v1);
-tests.push_back(v2);
-tests.push_back(v3);
-
-
-Vector3d v4(0.0, 0.1, 1);
-Vector3d v5(0.33, 0.43, 1);
-Vector3d v6(0.66, 0.43, 1);
-Vector3d v7(1.0, 0.1, 1);
-
-
-
-tests.push_back(v4);
-tests.push_back(v5);
-tests.push_back(v6);
-tests.push_back(v7);
-
-
-Vector3d v8(0.0, 0.2, 2);
-Vector3d v9(0.33, 0.53, 2);
-Vector3d v10(0.66, 0.53, 2);
-Vector3d v11(1.0, 0.2, 2);
-
-
-tests.push_back(v8);
-tests.push_back(v9);
-tests.push_back(v10);
-tests.push_back(v11);
-
-Vector3d v12(0.0, 0.3, 3);
-Vector3d v13(0.33, 0.63, 3);
-Vector3d v14(0.66, 0.63, 3);
-Vector3d v15(1.0, 0.3, 3);
-
-
-tests.push_back(v12);
-tests.push_back(v13);
-tests.push_back(v14);
-tests.push_back(v15);
-
-*/
