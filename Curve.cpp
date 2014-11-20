@@ -360,7 +360,7 @@ testResults edgeTests(Patch patch,const PatchTri& tri, double error){
 	//case 2
 //	else if (!lefttest && righttest && bottomtest){
 		newTriangles.push_back(PatchTri(tri.vertexA, tri.vertexB, left));
-		newTriangles.push_back(PatchTri(left, tri.vertexB, tri.vertexC));
+		newTriangles.push_back(PatchTri(tri.vertexB, tri.vertexC, left));
 	//}
 
 	//case 3
@@ -425,7 +425,7 @@ void adaptiveTriangulate(Patch patch, double error){
 
 	//create triangle tri,s add to patch tri vector, run tesselation, passing in 
 	PatchTri first(Vector3d(0, 0,0), Vector3d(1, 0,0), Vector3d(0, 1,0)); 
-	PatchTri second(Vector3d(1, 0,0), Vector3d(1, 1,0), Vector3d(0, 1,0));
+	PatchTri second(Vector3d(1, 1,0), Vector3d(0, 1,0), Vector3d(1, 0,0)); //THIS IS WHERE THE BUG WAS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 	queue.push(first);
 	queue.push(second);
