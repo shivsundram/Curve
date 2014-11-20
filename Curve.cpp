@@ -283,6 +283,7 @@ void uniformTesselate(Patch patch, double step){
 
 
 class PatchTri{
+	//ACTUALLY THESE ARE 2D VECTORS. BUT I GET ALIGNMENT ERRORS WHEN I USE VECTOR2D
 public: 
 	Vector3d vertexA; 
 	Vector3d vertexB;
@@ -318,7 +319,7 @@ testResults edgeTests(Patch patch,const PatchTri& tri, double error){
 	//	  /   \
 	//   A --- B
 	
-	//evaluate corners of triangle
+	//evaluate corners of triangle. remember patch tri has 2d vectors of (u,v) values
 	Vector3d A = patchInterp(patch, tri.vertexA[0], tri.vertexA[1]).point;
 	Vector3d B = patchInterp(patch, tri.vertexB[0], tri.vertexB[1]).point;
 	Vector3d C = patchInterp(patch, tri.vertexC[0], tri.vertexC[1]).point;
@@ -329,7 +330,7 @@ testResults edgeTests(Patch patch,const PatchTri& tri, double error){
 	Vector3d Tribottom = (A + B) / 2;
 	Vector3d Tricenter = (A + B+ C) / 3;
 
-	//generate midpoint u,v values of triangle for evaluation
+	//generate midpoint u,v values of triangle for evaluation. all 2d vectors
 	Vector3d left = (tri.vertexA + tri.vertexC) / 2;
 	Vector3d right = (tri.vertexB + tri.vertexC) / 2;
 	Vector3d bottom = (tri.vertexA + tri.vertexB) / 2;
@@ -350,39 +351,49 @@ testResults edgeTests(Patch patch,const PatchTri& tri, double error){
 	
 	vector <PatchTri> newTriangles;
 	//case 1
-	if (lefttest && righttest && bottomtest){
-		return testResults(true);
-		cout << "done" << endl;
-	}
+	
+	//if (lefttest && righttest && bottomtest){
+//		return testResults(true);
+//		cout << "done" << endl;
+//	}
 	
 	//case 2
-	else if (!lefttest && righttest && bottomtest){
+//	else if (!lefttest && righttest && bottomtest){
 		newTriangles.push_back(PatchTri(tri.vertexA, tri.vertexB, left));
-		newTriangles.push_back(PatchTri(tri.vertexB, tri.vertexC, left));
-	}
+		newTriangles.push_back(PatchTri(left, tri.vertexB, tri.vertexC));
+	//}
 
 	//case 3
-	else if (!lefttest && !righttest && bottomtest ){
-		newTriangles.push_back(PatchTri(tri.vertexA, tri.vertexB, left));
-		newTriangles.push_back(PatchTri(tri.vertexB,right, left));
-		newTriangles.push_back(PatchTri(right, tri.vertexC, left));
-	}
-
+	
+	//else if (!lefttest && !righttest && bottomtest ){
+	//	newTriangles.push_back(PatchTri(tri.vertexA, tri.vertexB, left));
+	//	newTriangles.push_back(PatchTri(tri.vertexB,right, left));
+	//	newTriangles.push_back(PatchTri(right, tri.vertexC, left));
+	//}
+	
 	//case 4
-	else if (!lefttest && !righttest && !bottomtest){
-		newTriangles.push_back(PatchTri(tri.vertexA, bottom, left));
-		newTriangles.push_back(PatchTri(bottom, right, left));
-		newTriangles.push_back(PatchTri(bottom, tri.vertexB, right));
-		newTriangles.push_back(PatchTri(left, right, tri.vertexC));
-	}
+	 //if (!lefttest && !righttest && !bottomtest){
+		//newTriangles.push_back(PatchTri(tri.vertexA, bottom, left));
+	//	newTriangles.push_back(PatchTri(bottom, right, left));
+//		newTriangles.push_back(PatchTri(bottom, tri.vertexB, right));
+	//	newTriangles.push_back(PatchTri(left, right, tri.vertexC));
+		
+//	}
+	// else{
+	//	 return testResults(true);
+	 //}
 
 	//case 5
+	
+//	else if (lefttest && righttest && bottomtest && !centertest){
+	//	newTriangles.push_back(PatchTri(tri.vertexA, tri.vertexB, center));
+	//	newTriangles.push_back(PatchTri(tri.vertexB, tri.vertexC, center));
+	//	newTriangles.push_back(PatchTri(tri.vertexA, center, tri.vertexC));
+	
+		
+		return testResults(false, newTriangles);
+		//}
 	/*
-	else if (lefttest && righttest && bottomtest && !centertest){
-		newTriangles.push_back(PatchTri(tri.vertexA, tri.vertexB, center));
-		newTriangles.push_back(PatchTri(tri.vertexB, tri.vertexC, center));
-		newTriangles.push_back(PatchTri(tri.vertexA, center, tri.vertexC));
-	}
 	//case 6
 	else if (!lefttest && righttest && bottomtest && !centertest){
 		newTriangles.push_back(PatchTri(tri.vertexA, tri.vertexB, center));
@@ -404,12 +415,7 @@ testResults edgeTests(Patch patch,const PatchTri& tri, double error){
 
 	//case 8
 	*/
-	else{
-		cout << "eh" << endl;
-		return testResults(true);
-	}
-	cout << "whaddup" << endl; 
-	return testResults(false, newTriangles);
+
 
 }
 
@@ -423,22 +429,24 @@ void adaptiveTriangulate(Patch patch, double error){
 
 	queue.push(first);
 	queue.push(second);
-
-	while (!queue.empty()){
+	unsigned int j = 0; 
+	while (j<2){
 		PatchTri popped = queue.front();
 		testResults result = edgeTests(patch, popped, error);
 		
-		if (result.flatEnough){
+	//	if (result.flatEnough){
+	//		queue.pop();
+	//		triangulation.push_back(popped);
+	//	}
+	//	else{
 			queue.pop();
-			triangulation.push_back(popped);
-		}
-		else{
 			for (unsigned int i = 0; i < result.newTriangles.size(); ++i){
-				queue.pop();
-				queue.push(result.newTriangles[i]);
+				
+				triangulation.push_back(result.newTriangles[i]);
 				cout << "popped" << endl; 
 			}
-		}
+//		}
+		++j; 
 	}
 
 	for (unsigned int i=0; i < triangulation.size(); ++i){
@@ -462,11 +470,18 @@ void display() {
 
 	glEnable(GL_LIGHTING);
 	glEnable(GL_LIGHT0);
+	glEnable(GL_LIGHT1);
 
 	GLfloat lightColor0[] = { 0.5f, 0.5f, 0.5f, 1.0f }; //Color (0.5, 0.5, 0.5)
 	GLfloat lightPos0[] = { 4.0f, 4.0f, -4.0f, 1.0f }; //Positioned at (4, 4, 4)
 	glLightfv(GL_LIGHT0, GL_DIFFUSE, lightColor0);
 	glLightfv(GL_LIGHT0, GL_POSITION, lightPos0);
+
+
+	GLfloat lightColor1[] = { 0.5f, 0.5f, 0.5f, 1.0f }; //Color (0.5, 0.5, 0.5)
+	GLfloat lightPos1[] = { -4.0f, -4.0f, -4.0f, 1.0f }; //Positioned at (4, 4, 4)
+	glLightfv(GL_LIGHT1, GL_DIFFUSE, lightColor1);
+	glLightfv(GL_LIGHT1, GL_POSITION, lightPos1);
 
 
 	if (isSmoothShading) {
