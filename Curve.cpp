@@ -78,7 +78,7 @@ vector <Shape*> faces;
 
 int rotateX = 0;
 int rotateY = 0;
-double tessArg = 0.1;
+double tessArg = 0.01;
 double translateX = 0;
 double translateY = 0;
 double scale = 1;
@@ -352,36 +352,64 @@ testResults edgeTests(Patch patch,const PatchTri& tri, double error){
 	vector <PatchTri> newTriangles;
 	//case 1
 	
-	//if (lefttest && righttest && bottomtest){
-//		return testResults(true);
-//		cout << "done" << endl;
-//	}
-	
-	//case 2
-//	else if (!lefttest && righttest && bottomtest){
+	if (lefttest && righttest && bottomtest){
+		return testResults(true);
+		cout << "done" << endl;
+	}
+	//case 2.1
+	else if (!lefttest && righttest && bottomtest){
 		newTriangles.push_back(PatchTri(tri.vertexA, tri.vertexB, left));
 		newTriangles.push_back(PatchTri(tri.vertexB, tri.vertexC, left));
-	//}
+	}
+
+	//case 2.2
+	else if (lefttest && !righttest && bottomtest){
+		newTriangles.push_back(PatchTri(tri.vertexA, right, tri.vertexB));
+		newTriangles.push_back(PatchTri(tri.vertexA, tri.vertexC, right));
+	}
+
+	//case 2.2
+	else if (lefttest && righttest && !bottomtest){
+		newTriangles.push_back(PatchTri(tri.vertexA, tri.vertexC, bottom));
+		newTriangles.push_back(PatchTri(tri.vertexB, tri.vertexC, bottom));
+	}
+
 
 	//case 3
 	
-	//else if (!lefttest && !righttest && bottomtest ){
-	//	newTriangles.push_back(PatchTri(tri.vertexA, tri.vertexB, left));
-	//	newTriangles.push_back(PatchTri(tri.vertexB,right, left));
-	//	newTriangles.push_back(PatchTri(right, tri.vertexC, left));
-	//}
-	
+	else if (!lefttest && !righttest && bottomtest ){
+		newTriangles.push_back(PatchTri(tri.vertexB, left, tri.vertexA));
+		newTriangles.push_back(PatchTri(tri.vertexB,right, left));
+		newTriangles.push_back(PatchTri(right, tri.vertexC, left));
+	}
+
+	else if (!lefttest && righttest && !bottomtest){
+		newTriangles.push_back(PatchTri(tri.vertexA, bottom, left));
+		newTriangles.push_back(PatchTri(tri.vertexC, left, bottom));
+		newTriangles.push_back(PatchTri(bottom, tri.vertexB, tri.vertexC));
+	}
+
+
+	else if (lefttest && !righttest && !bottomtest){
+		newTriangles.push_back(PatchTri(tri.vertexA, bottom, right));
+		newTriangles.push_back(PatchTri(bottom, tri.vertexB, right));
+		newTriangles.push_back(PatchTri(left, right, tri.vertexC));
+	}
+
+
 	//case 4
-	 //if (!lefttest && !righttest && !bottomtest){
-		//newTriangles.push_back(PatchTri(tri.vertexA, bottom, left));
-	//	newTriangles.push_back(PatchTri(bottom, right, left));
-//		newTriangles.push_back(PatchTri(bottom, tri.vertexB, right));
-	//	newTriangles.push_back(PatchTri(left, right, tri.vertexC));
+	else if (!lefttest && !righttest && !bottomtest){
+		newTriangles.push_back(PatchTri(tri.vertexA, bottom, left));
+		newTriangles.push_back(PatchTri(bottom, right, left));
+		newTriangles.push_back(PatchTri(bottom, tri.vertexB, right));
+		newTriangles.push_back(PatchTri(left, right, tri.vertexC));
 		
-//	}
-	// else{
-	//	 return testResults(true);
-	 //}
+	}
+
+	
+	else{
+		 return testResults(true);
+	 }
 
 	//case 5
 	
@@ -430,22 +458,21 @@ void adaptiveTriangulate(Patch patch, double error){
 	queue.push(first);
 	queue.push(second);
 	unsigned int j = 0; 
-	while (j<2){
+	while (!queue.empty()){
 		PatchTri popped = queue.front();
 		testResults result = edgeTests(patch, popped, error);
 		
-	//	if (result.flatEnough){
-	//		queue.pop();
-	//		triangulation.push_back(popped);
-	//	}
-	//	else{
+		if (result.flatEnough){
 			queue.pop();
-			for (unsigned int i = 0; i < result.newTriangles.size(); ++i){
-				
+			triangulation.push_back(popped);
+		}
+		else{
+			queue.pop();
+			for (unsigned int i = 0; i < result.newTriangles.size(); ++i){				
 				triangulation.push_back(result.newTriangles[i]);
 				cout << "popped" << endl; 
 			}
-//		}
+		}
 		++j; 
 	}
 
